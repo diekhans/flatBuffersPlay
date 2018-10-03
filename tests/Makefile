@@ -2,12 +2,12 @@ BINDIR = ../bin
 pslSerialize = ${BINDIR}/pslSerialize
 pslDeserialize = ${BINDIR}/pslDeserialize
 
-test: testSerial
+test: testStream
 
-testSerial:
+testStream:
 	@mkdir -p output
-	${pslSerialize} input/test.psl output/$@.flatb
-	${pslDeserialize} output/$@.flatb output/$@.psl
+	${pslSerialize} stream input/test.psl output/$@.flatb
+	${pslDeserialize} stream output/$@.flatb output/$@.psl
 	diff input/test.psl output/$@.psl
 
 clean:

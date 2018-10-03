@@ -57,25 +57,31 @@ static bool deserializePsl(istream &inFh,
 }
 
 
-static void deserializePsls(istream &inFh,
+static void deserializePsls(const string& flatbPslFile,
                             FILE *outFh) {
+    ifstream inFh;
+    inFh.open(flatbPslFile, std::ios::binary | std::ios::in);
     while (deserializePsl(inFh, outFh)) {
         continue;
     }
+    inFh.close();
 }
 
 int main(int argc, const char* argv[]) {
-    if (argc != 3) {
-        cerr << "Wrong # args: " << argv[0] << " flatbPslFile textPslFile" <<endl;
+    if (argc != 4) {
+        cerr << "Wrong # args: " << argv[0] << " mode flatbPslFile textPslFile" <<endl;
         exit(1);
     }
-    string flatbPslFile = string(argv[1]);
-    string textPslFile = string(argv[2]);
-    ifstream inFh;
-    inFh.open(flatbPslFile, std::ios::binary | std::ios::in);
+    string mode = string(argv[1]);
+    string flatbPslFile = string(argv[2]);
+    string textPslFile = string(argv[3]);
     FILE *outFh = mustOpen(const_cast<char*>(textPslFile.c_str()), const_cast<char*>("w"));
-    deserializePsls(inFh, outFh);
+    if (mode == "stream") {
+        deserializePsls(flatbPslFile, outFh);
+    } else {
+        cerr << "Error: invalid mode " << mode << ", expected one of 'stream'" <<endl;
+        exit(1);
+    }
     carefulClose(&outFh);
-    inFh.close();
 }
 

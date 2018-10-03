@@ -50,26 +50,32 @@ static void serializePsl(flatbuffers::FlatBufferBuilder& builder,
 
 
 static void serializePsls(struct psl *inPsls,
-                          ostream &outFh) {
+                          const string& flatbPslFile) {
+    ofstream outFh;
+    outFh.open(flatbPslFile, std::ios::binary | std::ios::out);
     flatbuffers::FlatBufferBuilder builder;
     for (struct psl *psl = inPsls; psl != NULL; psl = psl->next) {
         serializePsl(builder, psl, outFh);
     }
+    outFh.close();
 }
                        
 
 
 int main(int argc, const char* argv[]) {
-    if (argc != 3) {
-        cerr << "Wrong # args: " << argv[0] << " textPslFile flatbPslFile" <<endl;
+    if (argc != 4) {
+        cerr << "Wrong # args: " << argv[0] << " mode textPslFile flatbPslFile" <<endl;
         exit(1);
     }
-    string textPslFile = string(argv[1]);
-    string flatbPslFile = string(argv[2]);
+    string mode = string(argv[1]);
+    string textPslFile = string(argv[2]);
+    string flatbPslFile = string(argv[3]);
     struct psl *inPsls = pslLoadAll(const_cast<char*>(textPslFile.c_str()));
-    ofstream outFh;
-    outFh.open(flatbPslFile, std::ios::binary | std::ios::out);
-    serializePsls(inPsls, outFh);
-    outFh.close();
+    if (mode == "stream") {
+        serializePsls(inPsls, flatbPslFile);
+    } else {
+        cerr << "Error: invalid mode " << mode << ", expected one of 'stream'" <<endl;
+        exit(1);
+    }
 }
 
