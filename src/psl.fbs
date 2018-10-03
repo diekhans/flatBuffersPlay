@@ -1,0 +1,29 @@
+// PSL schema
+
+namespace Kent;
+
+table Psl {
+    match: uint;        // Number of bases that match that aren't repeats
+    misMatch: uint;     // Number of bases that don't match
+    repMatch: uint;     // Number of bases that match but are part of repeats
+    nCount: uint;       // Number of 'N' bases
+    qNumInsert: uint;   // Number of inserts in query
+    qBaseInsert: uint;  // Number of bases inserted in query
+    tNumInsert: uint;   // Number of inserts in target
+    tBaseInsert: uint;  // Number of bases inserted in target
+    strand: string;     // + or - for strand
+    qName: string;      // Query sequence name
+    qSize: uint;        // Query sequence size
+    qStart: uint;       // Alignment start position in query
+    qEnd: uint;         // Alignment end position in query
+    tName: string;      // Target sequence name
+    tSize: uint;        // Target sequence size
+    tStart: uint;       // Alignment start position in target
+    tEnd: uint;         // Alignment end position in target
+    blockCount: uint;   // Number of blocks in alignment
+    blockSizes: [uint]; // Size of each block
+    qStarts: [uint];    // Start of each block in query.
+    tStarts: [uint];    // Start of each block in target.
+}
+
+root_type Psl;
