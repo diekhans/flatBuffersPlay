@@ -13,12 +13,70 @@ extern "C" {
 using namespace std;
 using namespace Kent;
 
+// allow for multiple roots 
+inline const Kent::Psl *GetPsl(const void *buf) {
+  return flatbuffers::GetRoot<Kent::Psl>(buf);
+}
+
+// allow for multiple roots 
+inline const Kent::PslPile *GetPslPile(const void *buf) {
+  return flatbuffers::GetRoot<Kent::PslPile>(buf);
+}
+
 static void errnoExit(const string& msg) {
     cerr << msg << ": " << ::strerror(errno) << endl;
     exit(1);
 }
 
+class MmappedFile {
+    private:
+    int fd;
+    public:
+    const string fname;
+    size_t size;
+    void *fmem;
+    MmappedFile(const string& fname):
+        fname(fname) {
+        fd = ::open(fname.c_str(), O_RDONLY);
+        if (fd < 0) {
+            errnoExit("Can't open flatbuffers file: " + fname);
+        }
+        struct stat fileStat;
+        if (::fstat(fd, &fileStat) < 0) {
+            errnoExit("stat() failed on: " + fname);
+        }
+        size = fileStat.st_size;
+        fmem = mmap(0, fileStat.st_size, PROT_READ, MAP_SHARED|MAP_FILE, fd, 0);
+        if (fmem == MAP_FAILED) {
+            errnoExit("mmap() failed on: " + fname);
+        }
+    }
+
+    ~MmappedFile() {
+        ::munmap(const_cast<void*>(fmem), size);
+        ::close(fd);
+    }
+
+};
+
+// step through this to see scalar access (not static to avoid inline)
+uint32_t scalarAccess(const Psl *pslfb) {
+    uint32_t n = pslfb->blockCount();
+    return n;
+}
+
+
+// step through this to see vector access (not static to avoid inline)
+uint32_t vectorAccess(const Psl *pslfb,
+                      int i) {
+    uint32_t n = pslfb->blockCount();
+    return n;
+}
+
 static struct psl* flatbToPsl(const Psl *pslfb) {
+    scalarAccess(pslfb);
+    vectorAccess(pslfb, 0);
+    
     uint32_t blockCnt = pslfb->blockCount();
     struct psl* psl = pslNew(const_cast<char*>(pslfb->qName()->c_str()),
                              pslfb->qSize(), pslfb->qStart(), pslfb->qEnd(),
@@ -35,12 +93,19 @@ static struct psl* flatbToPsl(const Psl *pslfb) {
     psl->tNumInsert = pslfb->tNumInsert();
     psl->tBaseInsert = pslfb->tBaseInsert();
     for (unsigned i = 0; i < pslfb->blockCount(); i++) {
-        psl->blockSizes[i] = (*pslfb->blockSizes())[i];
-        psl->qStarts[i] = (*pslfb->qStarts())[i];
-        psl->tStarts[i] = (*pslfb->tStarts())[i];
+        psl->blockSizes[i] = pslfb->blockSizes()->Get(i);
+        psl->qStarts[i] = pslfb->qStarts()->Get(i);
+        psl->tStarts[i] = pslfb->tStarts()->Get(i);
         psl->blockCount++;
     }
     return psl;
+}
+
+static void pslfbTabWrite(const Psl *pslfb,
+                          FILE *outFh) {
+    struct psl* psl = flatbToPsl(pslfb);
+    pslTabOut(psl, outFh);
+    pslFree(&psl);
 }
 
 static bool deserializePslStream(istream &inFh,
@@ -56,10 +121,7 @@ static bool deserializePslStream(istream &inFh,
         cerr << "Error: premature EOF" << endl;
         exit(1);
     }
-    const Psl *pslfb = GetPsl(buf);
-    struct psl* psl = flatbToPsl(pslfb);
-    pslTabOut(psl, outFh);
-    pslFree(&psl);
+    pslfbTabWrite(GetPsl(buf), outFh);
     return true;
 }
 
@@ -80,34 +142,27 @@ static inline const void* ptrAdd(const void* ptr, size_t amt) {
 
 static void deserializePslMmap(const void* buf,
                                FILE *outFh) {
-    const Psl *pslfb = GetPsl(buf);
-    struct psl* psl = flatbToPsl(pslfb);
-    pslTabOut(psl, outFh);
-    pslFree(&psl);
+    pslfbTabWrite(GetPsl(buf), outFh);
 }
 
 static void deserializePslsMmap(const string& flatbPslFile,
                                 FILE *outFh) {
-    int fd = ::open(flatbPslFile.c_str(), O_RDONLY);
-    if (fd < 0) {
-        errnoExit("Can't open flatbuffers file: " + flatbPslFile);
-    }
-    struct stat fileStat;
-    if (::fstat(fd, &fileStat) < 0) {
-        errnoExit("stat() failed on: " + flatbPslFile);
-    }
-    const void* buf = mmap(0, fileStat.st_size, PROT_READ, MAP_SHARED|MAP_FILE, fd, 0);
-    if (buf == MAP_FAILED) {
-        errnoExit("mmap() failed on: " + flatbPslFile);
-    }
+    MmappedFile pslsfb(flatbPslFile);
     size_t offset = 0;
-    while (offset < fileStat.st_size) {
-        uint32_t recSize = *reinterpret_cast<const uint32_t*>(ptrAdd(buf, offset));
-        deserializePslMmap(ptrAdd(buf, offset + sizeof(uint32_t)), outFh);
+    while (offset < pslsfb.size) {
+        uint32_t recSize = *reinterpret_cast<const uint32_t*>(ptrAdd(pslsfb.fmem, offset));
+        deserializePslMmap(ptrAdd(pslsfb.fmem, offset + sizeof(uint32_t)), outFh);
         offset += sizeof(uint32_t) + recSize;
     }
-    ::munmap(const_cast<void*>(buf), fileStat.st_size);
-    ::close(fd);
+}
+
+static void deserializePslsPile(const string& flatbPslFile,
+                                FILE *outFh) {
+    MmappedFile pslsfb(flatbPslFile);
+    const PslPile *pslPile = GetPslPile(pslsfb.fmem);
+    for (int i = 0; i < pslPile->psls()->size(); i++) {
+        pslfbTabWrite(pslPile->psls()->Get(i), outFh);
+    }
 }
 
 int main(int argc, const char* argv[]) {
@@ -123,8 +178,10 @@ int main(int argc, const char* argv[]) {
         deserializePslsStream(flatbPslFile, outFh);
     } else if (mode == "mmap") {
         deserializePslsMmap(flatbPslFile, outFh);
+    } else if (mode == "pile") {
+        deserializePslsPile(flatbPslFile, outFh);
     } else {
-        cerr << "Error: invalid mode " << mode << ", expected one of 'stream', or 'mmap'" <<endl;
+        cerr << "Error: invalid mode " << mode << ", expected one of 'stream', 'mmap', or 'pile'" <<endl;
         exit(1);
     }
     carefulClose(&outFh);

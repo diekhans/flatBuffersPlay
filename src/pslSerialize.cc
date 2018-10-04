@@ -61,6 +61,23 @@ static void serializePslsStream(struct psl *inPsls,
 }
                        
 
+static void serializePslsPile(struct psl *inPsls,
+                              const string& flatbPslFile) {
+    flatbuffers::FlatBufferBuilder builder;
+    vector<flatbuffers::Offset<Psl>> psls;
+    
+    for (struct psl *psl = inPsls; psl != NULL; psl = psl->next) {
+        psls.push_back(pslToFlatb(builder, psl));
+    }
+    auto pslPile = CreatePslPile(builder, builder.CreateVector(psls));
+    builder.Finish(pslPile);
+    ofstream outFh;
+    outFh.open(flatbPslFile, std::ios::binary | std::ios::out);
+    auto buf = builder.GetBufferPointer();
+    outFh.write(reinterpret_cast<const char*>(buf), builder.GetSize());
+    outFh.close();
+}
+
 
 int main(int argc, const char* argv[]) {
     if (argc != 4) {
@@ -73,8 +90,10 @@ int main(int argc, const char* argv[]) {
     struct psl *inPsls = pslLoadAll(const_cast<char*>(textPslFile.c_str()));
     if (mode == "stream") {
         serializePslsStream(inPsls, flatbPslFile);
+    } else if (mode == "pile") {
+        serializePslsPile(inPsls, flatbPslFile);
     } else {
-        cerr << "Error: invalid mode " << mode << ", expected one of 'stream'" <<endl;
+        cerr << "Error: invalid mode " << mode << ", expected one of 'stream', or 'pile'" <<endl;
         exit(1);
     }
 }

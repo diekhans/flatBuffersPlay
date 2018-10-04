@@ -1,6 +1,11 @@
 BINDIR = ../bin
 OBJDIR = ../objs
 
+.SECONDARY:
+
+OPT = -g
+OPT = -g -O3
+
 PROGS = ${BINDIR}/pslSerialize ${BINDIR}/pslDeserialize
 FLATBUF_CPP = psl_generated.h
 
@@ -18,10 +23,9 @@ pslSerialize_OBJS =  ${OBJDIR}/pslSerialize.o
 pslDeserialize_OBJS =  ${OBJDIR}/pslDeserialize.o
 DEPENDS =  ${SRCS:%.cc=%.depend}
 
-CXXFLAGS = ${CPPFLAGS} -g -Wall -Wno-sign-compare
+CXXFLAGS = ${CPPFLAGS} ${OPT} -Wall -Wno-sign-compare
 
-all: ${PROGS}
-
+all: ${PROGS} pslDeserialize.s
 
 ${BINDIR}/%: ${OBJDIR}/%.o
 	@mkdir -p $(dir $@)
@@ -36,11 +40,13 @@ ${OBJDIR}/%.o: %.cc ${FLATBUF_CPP}
 
 
 %_generated.h: %.fbs
-	flatc -c psl.fbs 
+	flatc -c $<
 
+pslDeserialize.s: pslDeserialize.cc psl_generated.h
+	${CXX} -S -fverbose-asm ${CXXFLAGS} -c -o $@ $<
 clean:
 	rm -fr ${FLATBUF_CPP} ${OBJS} ${PROGS} ${PROGS:%=%.dSYM} ${DEPENDS}
-	rm -rf ${BINDIR} ${OBJDIR}
+	rm -rf ${BINDIR} ${OBJDIR} pslDeserialize.s
 
 
 

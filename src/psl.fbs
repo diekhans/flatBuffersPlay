@@ -26,4 +26,7 @@ table Psl {
     tStarts: [uint];    // Start of each block in target.
 }
 
-root_type Psl;
+table PslPile {
+    psls: [Psl];
+}
+
