@@ -18,7 +18,7 @@ pslSerialize_OBJS =  ${OBJDIR}/pslSerialize.o
 pslDeserialize_OBJS =  ${OBJDIR}/pslDeserialize.o
 DEPENDS =  ${SRCS:%.cc=%.depend}
 
-CXXFLAGS = ${CPPFLAGS} -g -Wall
+CXXFLAGS = ${CPPFLAGS} -g -Wall -Wno-sign-compare
 
 all: ${PROGS}
 
