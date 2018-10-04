@@ -23,7 +23,7 @@ pslSerialize_OBJS =  ${OBJDIR}/pslSerialize.o
 pslDeserialize_OBJS =  ${OBJDIR}/pslDeserialize.o
 DEPENDS =  ${SRCS:%.cc=%.depend}
 
-CXXFLAGS = ${CPPFLAGS} ${OPT} -Wall -Wno-sign-compare
+CXXFLAGS = ${CPPFLAGS} ${OPT} -std=c++11 -Wall -Wno-sign-compare
 
 all: ${PROGS} pslDeserialize.s
 
